@@ -1,9 +1,13 @@
 package com.qapital.savings.rule;
 
+import com.qapital.savings.event.SavingsEvent;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -24,6 +28,14 @@ public class SavingsRulesController {
         return savingsRulesService.activeRulesForUser(userId);
     }
 
+
+
+
+    @PostMapping(
+            value = "/createSavings", consumes = "application/json", produces = "application/json")
+    public List<SavingsEvent> savings(@RequestBody SavingsRule savingsRule){
+        return savingsRulesService.executeRule(savingsRule);
+    }
 
 
 }
