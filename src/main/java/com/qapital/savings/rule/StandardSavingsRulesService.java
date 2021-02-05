@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class StandardSavingsRulesService implements SavingsRulesService {
 
-    private TransactionsService transactionsService = null;
+    final TransactionsService transactionsService;
 
     @Autowired
     public StandardSavingsRulesService(TransactionsService transactionsService) {
@@ -41,70 +41,57 @@ public class StandardSavingsRulesService implements SavingsRulesService {
 
         List<SavingsEvent> savingsEventList = new ArrayList<SavingsEvent>();
 
-        //finds negative expense
+        //finds negative expenses
         List<Transaction> expenseTransactions = latestTransactionsForUser.stream()
-                .filter(transaction -> transaction.getAmount() < 0).collect(
-                        Collectors.toList());
+                .filter(transaction -> transaction.getAmount() < 0).collect(Collectors.toList());
 
         //applies rule to those transactions and adds them to saving list
-        for (int i = 0; i < expenseTransactions.size() ; i++) {
-            Transaction transaction = expenseTransactions.get(i);
-            SavingsEvent roundOffRuleEvent = applyRoundOffRule(transaction, savingsRule);
-            SavingsEvent guiltyPleasureRuleEvent = applyGuiltyPleasureRule(transaction, savingsRule);
-            savingsEventList.add(roundOffRuleEvent);
-            savingsEventList.add(guiltyPleasureRuleEvent);
-
+        for (Transaction transaction : expenseTransactions) {
+            savingsEventList.addAll(applyRoundOffRule(transaction, savingsRule));
+            savingsEventList.addAll(applyGuiltyPleasureRule(transaction, savingsRule));
         }
         return savingsEventList;
     }
 
-    //checks for description, then goals and if multiple  goals  present splits the amount equally amongst them
-    private SavingsEvent applyGuiltyPleasureRule(Transaction transaction, SavingsRule savingsRule) {
-        SavingsEvent savingsEvent = new SavingsEvent();
+    //checks for description
+    private static List<SavingsEvent> applyGuiltyPleasureRule(Transaction transaction,
+            SavingsRule savingsRule) {
+
         if (transaction.getDescription().equals(savingsRule.getPlaceDescription())) {
-            savingsEvent.setRuleType(RuleType.guiltypleasure);
-            ruleFunction(transaction, savingsRule, savingsRule.getAmount());
+            return ruleFunction(transaction, savingsRule, savingsRule.getAmount(),
+                    RuleType.guiltypleasure);
         }
+        return List.of();
 
-        return savingsEvent;
     }
 
-    private SavingsEvent applyRoundOffRule(Transaction transaction, SavingsRule savingsRule) {
+    private static List<SavingsEvent> applyRoundOffRule(Transaction transaction,
+            SavingsRule savingsRule) {
         Double savedAmount = roundUp(transaction.getAmount(), savingsRule.getAmount());
-        SavingsEvent savingsEvent = new SavingsEvent();
-        //can we pass on rule type in arguments?
-    savingsEvent.setRuleType(RuleType.roundup);
-        ruleFunction(transaction, savingsRule, savedAmount);
-        return savingsEvent;
+        return ruleFunction(transaction, savingsRule, savedAmount, RuleType.roundup);
+
     }
 
-
-    SavingsEvent ruleFunction(Transaction transaction, SavingsRule savingsRule, Double amount) {
-        if (savingsRule.getSavingsGoalIds().size() > 1) {
-            Double savedAmount =
-                    amount / savingsRule.getSavingsGoalIds().size();
-            for (int j = 0; j < savingsRule.getSavingsGoalIds().size(); j++) {
-                SavingsEvent savingsEvent = new SavingsEvent();
-                savingsEvent.setSavingsGoalId(savingsRule.getSavingsGoalIds().get(j));
-                savingsEvent.setAmount(savedAmount);
-                savingsEvent.setSavingsRuleId(savingsRule.getId());
-
-            }
-        } else {
-            SavingsEvent savingsEvent = new SavingsEvent();
-            savingsEvent.setUserId(transaction.getUserId());
-            savingsEvent.setAmount(amount);
-            savingsEvent.setSavingsGoalId(savingsRule.getSavingsGoalIds().get(0));
-            return savingsEvent;
-        }
-        return null;
+    //if multiple  goals  split the amount equally amongst them
+    private static List<SavingsEvent> ruleFunction(Transaction transaction, SavingsRule savingsRule,
+            Double amount, RuleType ruleType) {
+        Double savedAmount = amount / savingsRule.getSavingsGoalIds().size();
+        return savingsRule.getSavingsGoalIds().stream()
+                .map(savingsGoalId -> {
+                    SavingsEvent savingsEvent = new SavingsEvent();
+                    savingsEvent.setAmount(savedAmount);
+                    savingsEvent.setRuleType(ruleType);
+                    savingsEvent.setSavingsGoalId(savingsGoalId);
+                    savingsEvent.setSavingsRuleId(savingsRule.getId());
+                    savingsEvent.setUserId(transaction.getUserId());
+                    return savingsEvent;
+                })
+                .collect(Collectors.toList());
     }
 
     //it rounds the amount on the transaction to the nearest multiple of the configured roundup amount and generates a value with the difference as the saved amount.
-    public double roundUp(Double expense, Double configuredAmount) {
-        double roundedAmount = expense >= 0 ? ((expense + configuredAmount - 1) / configuredAmount)
-                * configuredAmount : (expense / configuredAmount) * configuredAmount;
-        return (expense - roundedAmount);
+    private static Double roundUp(Double expense, Double configuredAmount) {
+        return Math.ceil(expense / configuredAmount) * configuredAmount - expense;
     }
 }
 

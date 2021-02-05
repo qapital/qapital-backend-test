@@ -29,8 +29,6 @@ public class SavingsRulesController {
     }
 
 
-
-
     @PostMapping(
             value = "/createSavings", consumes = "application/json", produces = "application/json")
     public List<SavingsEvent> savings(@RequestBody SavingsRule savingsRule){
