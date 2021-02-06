@@ -1,6 +1,8 @@
 # qapital-backend-test
 Test task for backend developers
 
+![Java CI with Maven](https://github.com/qapital/qapital-backend-test/workflows/Java%20CI%20with%20Maven/badge.svg)
+
 ## Introduction
 This is a code skeleton for a test task for backend developer candidates seeking to join Qapital.
 
