@@ -3,7 +3,11 @@ package com.qapital.savings.rule;
 import com.qapital.bankdata.transaction.Transaction;
 import com.qapital.bankdata.transaction.TransactionsService;
 import com.qapital.savings.event.SavingsEvent;
+import com.qapital.savings.event.SavingsEvent.EventName;
 import com.qapital.savings.rule.SavingsRule.RuleType;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -58,8 +62,7 @@ public class StandardSavingsRulesService implements SavingsRulesService {
             SavingsRule savingsRule) {
 
         if (transaction.getDescription().equals(savingsRule.getPlaceDescription())) {
-            return ruleFunction(transaction, savingsRule, savingsRule.getAmount(),
-                    RuleType.guiltypleasure);
+            return ruleFunction(savingsRule, savingsRule.getAmount(), RuleType.guiltypleasure);
         }
         return List.of();
 
@@ -68,22 +71,30 @@ public class StandardSavingsRulesService implements SavingsRulesService {
     private static List<SavingsEvent> applyRoundOffRule(Transaction transaction,
             SavingsRule savingsRule) {
         Double savedAmount = roundUp(transaction.getAmount(), savingsRule.getAmount());
-        return ruleFunction(transaction, savingsRule, savedAmount, RuleType.roundup);
+        return ruleFunction(savingsRule, savedAmount, RuleType.roundup);
 
     }
 
-    //if multiple  goals  split the amount equally amongst them
-    private static List<SavingsEvent> ruleFunction(Transaction transaction, SavingsRule savingsRule,
-            Double amount, RuleType ruleType) {
+    //if multiple  goals  split the amount equally
+    private static List<SavingsEvent> ruleFunction(SavingsRule savingsRule, Double amount,
+            RuleType ruleType) {
+        LocalDate localdate
+                = LocalDate.ofInstant(
+                Instant.now(),
+                ZoneId.systemDefault());
         Double savedAmount = amount / savingsRule.getSavingsGoalIds().size();
         return savingsRule.getSavingsGoalIds().stream()
                 .map(savingsGoalId -> {
                     SavingsEvent savingsEvent = new SavingsEvent();
+                    savingsEvent.setId(savingsRule.getUserId());
                     savingsEvent.setAmount(savedAmount);
+                    savingsEvent.setCreated(Instant.now());
+                    savingsEvent.setSavingsRuleId(savingsRule.getId());
                     savingsEvent.setRuleType(ruleType);
                     savingsEvent.setSavingsGoalId(savingsGoalId);
-                    savingsEvent.setSavingsRuleId(savingsRule.getId());
-                    savingsEvent.setUserId(transaction.getUserId());
+                    savingsEvent.setUserId(savingsRule.getUserId());
+                    savingsEvent.setEventName(EventName.rule_application);
+                    savingsEvent.setDate(localdate);
                     return savingsEvent;
                 })
                 .collect(Collectors.toList());
